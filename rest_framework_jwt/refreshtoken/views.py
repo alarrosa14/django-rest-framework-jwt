@@ -27,6 +27,10 @@ class DelegateJSONWebToken(generics.CreateAPIView):
     API View that checks the veracity of a refresh token, returning a JWT if it
     is valid.
     """
+    
+    authentication_classes = ()
+    permission_classes = ()
+    
     serializer_class = DelegateJSONWebTokenSerializer
 
     def post(self, request, *args, **kwargs):
