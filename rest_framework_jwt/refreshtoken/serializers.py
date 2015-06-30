@@ -1,10 +1,15 @@
+from datetime import datetime
+
 from django.utils.translation import ugettext as _
 from rest_framework import exceptions
 from rest_framework import serializers
 from rest_framework_jwt.compat import CurrentUserDefault, Serializer
 
+from rest_framework_jwt.settings import api_settings
+
 from .models import RefreshToken
 
+jwt_refresh_expiration_delta = api_settings.JWT_REFRESH_EXPIRATION_DELTA
 
 class RefreshTokenSerializer(serializers.ModelSerializer):
     """
@@ -33,22 +38,17 @@ class RefreshTokenSerializer(serializers.ModelSerializer):
 
 
 class DelegateJSONWebTokenSerializer(Serializer):
-    client_id = serializers.CharField()
-    grant_type = serializers.CharField(
-        default='urn:ietf:params:oauth:grant-type:jwt-bearer',
-        required=False,
-    )
     refresh_token = serializers.CharField()
-    api_type = serializers.CharField(
-        default='app',
-        required=False,
-    )
 
     def validate(self, attrs):
         refresh_token = attrs['refresh_token']
         try:
             token = RefreshToken.objects.select_related('user').get(
                 key=refresh_token)
+            token_expiration_time = token.created.replace(tzinfo=None) + \
+                jwt_refresh_expiration_delta
+            if datetime.now() > token_expiration_time:
+                raise exceptions.AuthenticationFailed(_('Expired token.'))
         except RefreshToken.DoesNotExist:
             raise exceptions.AuthenticationFailed(_('Invalid token.'))
         attrs['user'] = token.user
